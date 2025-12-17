@@ -1,8 +1,17 @@
-from pathlib import Path
+import dagster as dg
 
-from dagster import definitions, load_from_defs_folder
+from homelab_pipelines.resources.bybit import BybitApiV5Resource
+from homelab_pipelines.settings import BybitSettings
+from homelab_pipelines.utils.paths import Paths
 
 
-@definitions
+@dg.definitions
 def defs():
-    return load_from_defs_folder(path_within_project=Path(__file__).parent)
+    return dg.load_from_defs_folder(path_within_project=Paths.package_root)
+
+
+@dg.definitions
+def resources():
+    return dg.Definitions(
+        resources={"bybit_v5": BybitApiV5Resource(base_url=BybitSettings().base_url)}
+    )
