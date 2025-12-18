@@ -367,6 +367,22 @@ wheels = [
 ]
 
 [[package]]
+name = "dagster-polars"
+version = "0.27.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dagster" },
+    { name = "polars" },
+    { name = "pyarrow" },
+    { name = "typing-extensions" },
+    { name = "universal-pathlib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e0/0e/33cc6b9d03c1997429ab510c284287ff6b96f8ae30c0ef7346ddb0514489/dagster_polars-0.27.8.tar.gz", hash = "sha256:2057a168d05885074a1b96b97738ccf026081c08b34dc6176199ac75a600de81", size = 18177, upload-time = "2025-11-12T16:02:37.357Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7f/65/8d04802f0a611a68889b5b135273aaaa86d54b35592974c4e43d769f3f16/dagster_polars-0.27.8-py3-none-any.whl", hash = "sha256:9b6cfd161579973d43fe098d1c3501af8d8a1538f4de6327209d3cb0e24bcdf0", size = 22608, upload-time = "2025-11-12T16:02:35.612Z" },
+]
+
+[[package]]
 name = "dagster-shared"
 version = "1.12.6"
 source = { registry = "https://pypi.org/simple" }
@@ -594,6 +610,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "dagster" },
+    { name = "dagster-polars" },
     { name = "ipykernel" },
     { name = "numpy" },
     { name = "pandas" },
@@ -615,6 +632,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "dagster", specifier = "==1.12.6" },
+    { name = "dagster-polars", specifier = ">=0.27.8" },
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "numpy", specifier = ">=2.3.5" },
     { name = "pandas", specifier = ">=2.3.3" },
