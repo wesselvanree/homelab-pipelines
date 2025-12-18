@@ -38,11 +38,16 @@ def raw_bybit_prices_15min_weekly(
     context: dg.AssetExecutionContext, bybit_api: BybitApiV5Resource
 ) -> pl.DataFrame:
     symbol, _ = context.partition_key.split("|")
-    start = context.partition_time_window.start
-    end = context.partition_time_window.end
+    partition_start = context.partition_time_window.start
+    partition_end = context.partition_time_window.end
+
+    context.log.info(f"Starting run id {context.run_id} for symbol {symbol}")
+
+    start = partition_start + dt.timedelta(minutes=15)
+    end = partition_end
 
     context.log.info(
-        f"Run id {context.run_id} with partition_key({context.partition_key}), partition_time_window(start={start}, end={end})"
+        f"Converted partition_time_window from ({partition_start}, {partition_end}) to ({start}, {end})"
     )
 
     args = GetMarkPriceKlineArgs(
@@ -53,7 +58,7 @@ def raw_bybit_prices_15min_weekly(
         end=end,
     )
     result = bybit_api.get_mark_price_kline(args).with_columns(
-        symbol=pl.lit(symbol), inserted_at=dt.datetime.now()
+        symbol=pl.lit(symbol), ingested_at=dt.datetime.now()
     )
 
     return result
