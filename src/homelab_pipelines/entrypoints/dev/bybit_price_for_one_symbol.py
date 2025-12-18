@@ -12,11 +12,11 @@ def main() -> None:
 
     args = GetMarkPriceKlineArgs(
         symbol="BTCUSDT",
-        interval="5",
-        start=dt.datetime.fromisoformat("2025-01-01T00:15+01:00"),
-        end=dt.datetime.fromisoformat("2025-01-01T00:30+01:00"),
+        interval="15",
+        start=dt.datetime.fromisoformat("2025-01-01T00:00+00:00"),
+        end=dt.datetime.fromisoformat("2025-01-07T00:00+00:00"),
         category="linear",
-        limit=200,
+        limit=1000,
     )
     result = resource.get_mark_price_kline(args)
 
