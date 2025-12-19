@@ -1,13 +1,10 @@
 import datetime as dt
-import logging
 
 import dagster as dg
 import polars as pl
 
 from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetMarkPriceKlineArgs
 from homelab_pipelines.utils.paths import Paths
-
-logger = logging.getLogger(__file__)
 
 bybit_symbols = (
     pl.read_csv(Paths.defs_data / "symbols.csv")
@@ -18,7 +15,7 @@ bybit_symbols = (
 raw_bybit_prices_15min_weekly_partition = dg.MultiPartitionsDefinition(
     {
         "symbol": dg.StaticPartitionsDefinition(bybit_symbols),
-        "week": dg.WeeklyPartitionsDefinition(start_date="2025-10-01"),
+        "week": dg.WeeklyPartitionsDefinition(start_date="2024-01-01"),
     }
 )
 
