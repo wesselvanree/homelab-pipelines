@@ -103,12 +103,12 @@ def stg_prices_15min_model_train(
     context.log.info(f"Processing dataframe of shape {stg_bybit_prices_15min.shape}")
 
     result = stg_bybit_prices_15min.filter(
-        pl.col("dt_utc").cast(pl.Datetime())
+        pl.col("start_time_utc").cast(pl.Datetime())
         >= dt.datetime.now() - dt.timedelta(days=model_settings.n_days_history_train)
     )
 
-    min_dt: dt.datetime = result.get_column("dt_utc").min()  # type: ignore
-    max_dt: dt.datetime = result.get_column("dt_utc").max()  # type: ignore
+    min_dt: dt.datetime = result.get_column("start_time_utc").min()  # type: ignore
+    max_dt: dt.datetime = result.get_column("start_time_utc").max()  # type: ignore
 
     n_days_history = (max_dt - min_dt).days
 
