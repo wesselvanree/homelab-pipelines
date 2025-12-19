@@ -21,6 +21,7 @@ dev = [
     "dagster-dg-cli",
     "ruff>=0.14.9",
     "inline-snapshot>=0.31.1",
+    "ipykernel>=7.1.0",
 ]
 
 [build-system]

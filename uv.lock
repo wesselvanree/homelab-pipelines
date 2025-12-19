@@ -626,6 +626,7 @@ dev = [
     { name = "dagster-dg-cli" },
     { name = "dagster-webserver" },
     { name = "inline-snapshot" },
+    { name = "ipykernel" },
     { name = "ruff" },
 ]
 
@@ -648,6 +649,7 @@ dev = [
     { name = "dagster-dg-cli" },
     { name = "dagster-webserver" },
     { name = "inline-snapshot", specifier = ">=0.31.1" },
+    { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.14.9" },
 ]
 
