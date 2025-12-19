@@ -16,7 +16,10 @@ bybit_symbols = (
 )
 
 bybit_symbols_partition = dg.StaticPartitionsDefinition(bybit_symbols)
-bybit_week_partitions = dg.WeeklyPartitionsDefinition(start_date="2024-01-01")
+bybit_week_partitions = dg.WeeklyPartitionsDefinition(
+    start_date="2024-01-01",
+    day_offset=1,  # Start partition on Monday instead of Sunday
+)
 raw_bybit_prices_15min_weekly_partition = dg.MultiPartitionsDefinition(
     {
         "symbol": bybit_symbols_partition,
