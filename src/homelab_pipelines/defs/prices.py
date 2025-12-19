@@ -32,7 +32,8 @@ raw_bybit_prices_15min_weekly_partition = dg.MultiPartitionsDefinition(
     partitions_def=raw_bybit_prices_15min_weekly_partition,
     retry_policy=dg.RetryPolicy(
         max_retries=3,
-        delay=30,
+        # Delay for 15 minutes, see https://bybit-exchange.github.io/docs/v5/rate-limit
+        delay=15 * 60,
         backoff=dg.Backoff.EXPONENTIAL,
         jitter=dg.Jitter.PLUS_MINUS,
     ),
