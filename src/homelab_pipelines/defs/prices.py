@@ -1,9 +1,11 @@
 import datetime as dt
+from typing import Dict
 
 import dagster as dg
 import polars as pl
 
 from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetMarkPriceKlineArgs
+from homelab_pipelines.settings import ModelSettings
 from homelab_pipelines.utils.paths import Paths
 
 bybit_symbols = (
@@ -12,16 +14,20 @@ bybit_symbols = (
     .sort()
     .to_list()
 )
+
+bybit_symbols_partition = dg.StaticPartitionsDefinition(bybit_symbols)
+bybit_week_partitions = dg.WeeklyPartitionsDefinition(start_date="2024-01-01")
 raw_bybit_prices_15min_weekly_partition = dg.MultiPartitionsDefinition(
     {
-        "symbol": dg.StaticPartitionsDefinition(bybit_symbols),
-        "week": dg.WeeklyPartitionsDefinition(start_date="2024-01-01"),
+        "symbol": bybit_symbols_partition,
+        "week": bybit_week_partitions,
     }
 )
 
 
 @dg.asset(
     description="Stock prices from Bybit for every 15 minutes partitioned per week.",
+    kinds={"python", "polars"},
     io_manager_key="polars_parquet_io_manager",
     partitions_def=raw_bybit_prices_15min_weekly_partition,
     retry_policy=dg.RetryPolicy(
@@ -58,4 +64,58 @@ def raw_bybit_prices_15min_weekly(
         symbol=pl.lit(symbol), ingested_at=dt.datetime.now()
     )
 
+    return result
+
+
+@dg.asset(
+    description="Complete dataset for a single symbol",
+    kinds={"python", "polars"},
+    io_manager_key="polars_parquet_io_manager",
+    partitions_def=bybit_symbols_partition,
+    automation_condition=dg.AutomationCondition.eager(),
+    ins={
+        "raw_bybit_prices_15min_weekly": dg.AssetIn(
+            partition_mapping=dg.MultiToSingleDimensionPartitionMapping("symbol")
+        )
+    },
+)
+def stg_bybit_prices_15min(
+    context: dg.AssetExecutionContext,
+    raw_bybit_prices_15min_weekly: Dict[str, pl.DataFrame],
+) -> pl.DataFrame:
+    context.log.info(f"Combining {len(raw_bybit_prices_15min_weekly)} dataframes")
+    return pl.concat(raw_bybit_prices_15min_weekly.values())
+
+
+@dg.asset(
+    description="Train dataset for each symbol",
+    kinds={"python", "polars"},
+    io_manager_key="polars_parquet_io_manager",
+    partitions_def=bybit_symbols_partition,
+    automation_condition=dg.AutomationCondition.eager(),
+    ins={"stg_bybit_prices_15min": dg.AssetIn(key="stg_bybit_prices_15min")},
+)
+def stg_prices_15min_model_train(
+    context: dg.AssetExecutionContext,
+    stg_bybit_prices_15min: pl.DataFrame,
+) -> pl.DataFrame:
+    model_settings = ModelSettings()
+    context.log.info(f"Processing dataframe of shape {stg_bybit_prices_15min.shape}")
+
+    result = stg_bybit_prices_15min.filter(
+        pl.col("dt_utc")
+        >= dt.datetime.now() - dt.timedelta(days=model_settings.n_days_history_train)
+    )
+
+    min_dt: dt.datetime = result.get_column("dt_utc").min()  # type: ignore
+    max_dt: dt.datetime = result.get_column("dt_utc").max()  # type: ignore
+
+    n_days_history = (max_dt - min_dt).days
+
+    if n_days_history < model_settings.n_days_history_train_min:
+        raise ValueError(
+            f"Not enough data to create training dataset, received {n_days_history} while {model_settings.n_days_history_train_min} are required"
+        )
+
+    context.log.info(f"Dataframe shape after processing {result.shape}")
     return result
