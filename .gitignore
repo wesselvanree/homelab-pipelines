@@ -204,4 +204,6 @@ __marimo__/
 
 # Custom
 .tmp*
-output
+output/**/*
+data/**/*
+!.gitkeep
