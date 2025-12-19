@@ -85,7 +85,11 @@ def stg_bybit_prices_15min(
     raw_bybit_prices_15min_weekly: Dict[str, pl.DataFrame],
 ) -> pl.DataFrame:
     context.log.info(f"Combining {len(raw_bybit_prices_15min_weekly)} dataframes")
-    return pl.concat(raw_bybit_prices_15min_weekly.values())
+
+    result = pl.concat(raw_bybit_prices_15min_weekly.values())
+    context.log.info(f"Created dataframe of shape {result.shape}")
+
+    return result
 
 
 @dg.asset(
@@ -104,7 +108,7 @@ def stg_prices_15min_model_train(
     context.log.info(f"Processing dataframe of shape {stg_bybit_prices_15min.shape}")
 
     result = stg_bybit_prices_15min.filter(
-        pl.col("dt_utc")
+        pl.col("dt_utc").cast(pl.Datetime())
         >= dt.datetime.now() - dt.timedelta(days=model_settings.n_days_history_train)
     )
 
