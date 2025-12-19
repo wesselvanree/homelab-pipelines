@@ -11,22 +11,24 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
-class GetMarkPriceKlineArgs(BaseModel):
+class GetKlineArgs(BaseModel):
     symbol: str
     interval: Literal[
         "1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "M", "W"
     ]
     start: dt.datetime
+    """Data with a start_time larger or equal to this are included."""
     end: dt.datetime
-    category: Literal["linear", "inverse"] = "linear"
-    limit: Annotated[int, Field(200, ge=0, le=1000)] = 200
+    """Data with a start_time smaller or equal to this are included."""
+    category: Literal["spot", "linear", "inverse"] = "linear"
+    limit: Annotated[int, Field(200, ge=1, le=1000)] = 200
 
 
 class BybitApiV5Resource(dg.ConfigurableResource):
     base_url: str
 
-    def get_mark_price_kline(self, args: GetMarkPriceKlineArgs) -> pl.DataFrame:
-        url = f"{self.base_url}/v5/market/mark-price-kline"
+    def get_kline(self, args: GetKlineArgs) -> pl.DataFrame:
+        url = f"{self.base_url}/v5/market/kline"
         args_dict = args.model_dump()
         args_dict["start"] = self._dt_to_bybit_timestamp(args_dict["start"])
         args_dict["end"] = self._dt_to_bybit_timestamp(args_dict["end"])
@@ -45,12 +47,14 @@ class BybitApiV5Resource(dg.ConfigurableResource):
                     "high": pl.Float32(),
                     "low": pl.Float32(),
                     "close": pl.Float32(),
+                    "volume": pl.Float32(),
+                    "turnover": pl.Float32(),
                 },
             )
             .with_columns(
                 pl.from_epoch("start_time_ms", time_unit="ms")
                 .dt.convert_time_zone("UTC")
-                .alias("dt_utc")
+                .alias("start_time_utc")
             )
             .drop("start_time_ms")
         )

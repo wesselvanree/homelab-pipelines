@@ -4,7 +4,7 @@ from typing import Dict
 import dagster as dg
 import polars as pl
 
-from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetMarkPriceKlineArgs
+from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetKlineArgs
 from homelab_pipelines.settings import ModelSettings
 from homelab_pipelines.utils.paths import Paths
 
@@ -45,23 +45,18 @@ def raw_bybit_prices_15min_weekly(
     partition_start = context.partition_time_window.start
     partition_end = context.partition_time_window.end
 
-    context.log.info(f"Starting run id {context.run_id} for symbol {symbol}")
+    context.log.info(f"Starting run_id {context.run_id} for symbol {symbol}")
 
-    start = partition_start + dt.timedelta(minutes=15)
-    end = partition_end
-
-    context.log.info(
-        f"Converted partition_time_window from ({partition_start}, {partition_end}) to ({start}, {end})"
-    )
-
-    args = GetMarkPriceKlineArgs(
+    # The get_kline time interval is inclusive by start_time, thus, we only want
+    args = GetKlineArgs(
         symbol=symbol,
         interval="15",
         limit=7 * 24 * 4,  # Number of observations in one week
-        start=start,
-        end=end,
+        start=partition_start,
+        end=partition_end - dt.timedelta(minutes=15),
     )
-    result = bybit_api.get_mark_price_kline(args).with_columns(
+    context.log.info(f"Fetching kline with args {args}")
+    result = bybit_api.get_kline(args).with_columns(
         symbol=pl.lit(symbol), ingested_at=dt.datetime.now()
     )
 

@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetMarkPriceKlineArgs
+from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetKlineArgs
 
 
 @pytest.fixture()
@@ -17,12 +17,12 @@ class TestBybitApiV5Resource:
         mock_response.json.return_value = {"id": 1, "name": "Alice"}
         mock_response.raise_for_status.return_value = None
 
-        result = resource.get_mark_price_kline(
-            GetMarkPriceKlineArgs(
+        result = resource.get_kline(
+            GetKlineArgs(
                 symbol="BTCUDST",
-                interval="5",
-                start=dt.datetime(2025, 1, 1, 0, 15),
-                end=dt.datetime(2025, 1, 1, 0, 15),
+                interval="15",
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                end=dt.datetime(2025, 1, 1, 0, 45),
                 category="linear",
                 limit=200,
             )
