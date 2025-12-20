@@ -7,7 +7,7 @@ from homelab_pipelines.settings import BybitSettings
 def main() -> None:
     """Do the work."""
 
-    bybit_settings = BybitSettings()
+    bybit_settings = BybitSettings()  # type: ignore
     resource = BybitApiV5Resource(base_url=bybit_settings.base_url)
 
     result = resource.get_kline(

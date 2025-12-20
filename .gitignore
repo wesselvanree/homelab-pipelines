@@ -207,3 +207,5 @@ __marimo__/
 output/**/*
 data/**/*
 !.gitkeep
+.env*
+!.env.example
