@@ -11,7 +11,10 @@ from homelab_pipelines.utils.datetime import Datetime
 from homelab_pipelines.utils.paths import Paths
 
 # This file does not change often. Including it like this means the dagster UI shows all partitions at once.
-bybit_symbols = pl.read_csv(Paths.defs_data / "bybit_symbols.csv")
+bybit_symbols = pl.read_csv(
+    Paths.defs_data / "bybit_symbols.csv",
+    schema_overrides={"launch_time": pl.Datetime("ns", "UTC")},
+)
 
 bybit_symbols_partition = dg.StaticPartitionsDefinition(
     bybit_symbols.get_column("symbol").to_list()
@@ -78,13 +81,13 @@ def raw_bybit_prices_15min_weekly(
 
 
 @dg.asset(
-    description="Stock prices from Bybit for every 15 minutes starting from the first day of the week until the current run time. This asset can be used to add to the weekly partitioned ones to form a dataset that includes everything until the most recent run.",
+    description="Stock prices from Bybit for every 15 minutes starting from the first day of this week until the current run time. This asset can be used to add to the weekly partitioned asset to form a dataset that includes everything until the most recent run.",
     kinds={"python", "polars"},
     io_manager_key="polars_parquet_io_manager",
     partitions_def=bybit_symbols_partition,
     retry_policy=bybit_retry_policy,
 )
-def raw_bybit_prices_15min_this_week(
+def raw_bybit_prices_15min_recent(
     context: dg.AssetExecutionContext, bybit_api: BybitApiV5Resource
 ) -> pl.DataFrame:
     symbol = context.partition_key
@@ -118,20 +121,20 @@ def raw_bybit_prices_15min_this_week(
         "raw_bybit_prices_15min_weekly": dg.AssetIn(
             partition_mapping=dg.MultiToSingleDimensionPartitionMapping("symbol")
         ),
-        "raw_bybit_prices_15min_this_week": dg.AssetIn(),
+        "raw_bybit_prices_15min_recent": dg.AssetIn(),
     },
 )
 def stg_bybit_prices_15min(
     context: dg.AssetExecutionContext,
     raw_bybit_prices_15min_weekly: Dict[str, pl.DataFrame],
-    raw_bybit_prices_15min_this_week: pl.DataFrame,
+    raw_bybit_prices_15min_recent: pl.DataFrame,
 ) -> pl.DataFrame:
     context.log.info(f"Combining {len(raw_bybit_prices_15min_weekly)} dataframes")
 
     result = pl.concat(raw_bybit_prices_15min_weekly.values())
     context.log.info(f"Concatenated weeks into a dataframe of shape {result.shape}")
 
-    observations_to_append = raw_bybit_prices_15min_this_week.filter(
+    observations_to_append = raw_bybit_prices_15min_recent.filter(
         pl.col("start_time_utc") >= result.get_column("start_time_utc").max()
     )
 
