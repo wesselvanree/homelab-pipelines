@@ -1,25 +1,23 @@
 import datetime as dt
-from typing import Dict
+from os import name
+from typing import Dict, Optional
 
 import dagster as dg
 import polars as pl
-import pytz
 
 from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetKlineArgs
 from homelab_pipelines.settings import ModelSettings
 from homelab_pipelines.utils.datetime import Datetime
 from homelab_pipelines.utils.paths import Paths
 
-bybit_symbols = (
-    pl.read_csv(Paths.defs_data / "symbols.csv")
-    .get_column("bybit_symbol")
-    .sort()
-    .to_list()
-)
+# This file does not change often. Including it like this means the dagster UI shows all partitions at once.
+bybit_symbols = pl.read_csv(Paths.defs_data / "bybit_symbols.csv")
 
-bybit_symbols_partition = dg.StaticPartitionsDefinition(bybit_symbols)
+bybit_symbols_partition = dg.StaticPartitionsDefinition(
+    bybit_symbols.get_column("symbol").to_list()
+)
 weekly_partition = dg.WeeklyPartitionsDefinition(
-    start_date="2024-01-01",
+    start_date="2023-01-01",
     day_offset=1,  # Start partition on Monday instead of Sunday
 )
 bybit_symbol_weekly_partition = dg.MultiPartitionsDefinition(
@@ -47,12 +45,19 @@ bybit_retry_policy = dg.RetryPolicy(
 )
 def raw_bybit_prices_15min_weekly(
     context: dg.AssetExecutionContext, bybit_api: BybitApiV5Resource
-) -> pl.DataFrame:
+) -> Optional[pl.DataFrame]:
     symbol, _ = context.partition_key.split("|")
     partition_start = context.partition_time_window.start
     partition_end = context.partition_time_window.end
 
-    context.log.info(f"Starting run_id {context.run_id} for symbol {symbol}")
+    context.log.info(
+        f"Starting run_id {context.run_id} for symbol {symbol} in range {partition_start}, {partition_end}"
+    )
+
+    bybit_symbol = bybit_symbols.filter(pl.col("symbol") == symbol).row(0, named=True)
+
+    if partition_start < bybit_symbol["launch_time"]:
+        return None
 
     # The get_kline time interval is inclusive by start_time.
     # Thus, we subtract 15 minutes to only fetch closed ones.

@@ -23,6 +23,7 @@ dev = [
     "ruff>=0.14.9",
     "inline-snapshot>=0.31.1",
     "ipykernel>=7.1.0",
+    "tqdm>=4.67.1",
 ]
 
 [build-system]
