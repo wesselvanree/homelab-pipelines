@@ -53,6 +53,7 @@ class BybitApiV5Resource(dg.ConfigurableResource):
         result = (
             pl.DataFrame(
                 data["result"]["list"],
+                orient="row",
                 schema={
                     "start_time_ms": pl.Int64(),
                     "open": pl.Float32(),
