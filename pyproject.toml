@@ -40,4 +40,8 @@ registry_modules = [
     "homelab_pipelines.components.*",
 ]
 
+[tool.pytest]
+testpaths = [
+    "tests",
+]
 

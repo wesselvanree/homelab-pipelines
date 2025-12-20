@@ -3,9 +3,11 @@ from typing import Dict
 
 import dagster as dg
 import polars as pl
+import pytz
 
 from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetKlineArgs
 from homelab_pipelines.settings import ModelSettings
+from homelab_pipelines.utils.datetime import DateTime
 from homelab_pipelines.utils.paths import Paths
 
 bybit_symbols = (
@@ -16,15 +18,23 @@ bybit_symbols = (
 )
 
 bybit_symbols_partition = dg.StaticPartitionsDefinition(bybit_symbols)
-bybit_week_partitions = dg.WeeklyPartitionsDefinition(
+weekly_partition = dg.WeeklyPartitionsDefinition(
     start_date="2024-01-01",
     day_offset=1,  # Start partition on Monday instead of Sunday
 )
-raw_bybit_prices_15min_weekly_partition = dg.MultiPartitionsDefinition(
+bybit_symbol_weekly_partition = dg.MultiPartitionsDefinition(
     {
         "symbol": bybit_symbols_partition,
-        "week": bybit_week_partitions,
+        "week": weekly_partition,
     }
+)
+
+bybit_retry_policy = dg.RetryPolicy(
+    max_retries=3,
+    # Delay for 15 minutes, see https://bybit-exchange.github.io/docs/v5/rate-limit
+    delay=15 * 60,
+    backoff=dg.Backoff.EXPONENTIAL,
+    jitter=dg.Jitter.PLUS_MINUS,
 )
 
 
@@ -32,14 +42,8 @@ raw_bybit_prices_15min_weekly_partition = dg.MultiPartitionsDefinition(
     description="Stock prices from Bybit for every 15 minutes partitioned per week.",
     kinds={"python", "polars"},
     io_manager_key="polars_parquet_io_manager",
-    partitions_def=raw_bybit_prices_15min_weekly_partition,
-    retry_policy=dg.RetryPolicy(
-        max_retries=3,
-        # Delay for 15 minutes, see https://bybit-exchange.github.io/docs/v5/rate-limit
-        delay=15 * 60,
-        backoff=dg.Backoff.EXPONENTIAL,
-        jitter=dg.Jitter.PLUS_MINUS,
-    ),
+    partitions_def=bybit_symbol_weekly_partition,
+    retry_policy=bybit_retry_policy,
 )
 def raw_bybit_prices_15min_weekly(
     context: dg.AssetExecutionContext, bybit_api: BybitApiV5Resource
@@ -50,13 +54,44 @@ def raw_bybit_prices_15min_weekly(
 
     context.log.info(f"Starting run_id {context.run_id} for symbol {symbol}")
 
-    # The get_kline time interval is inclusive by start_time, thus, we only want
+    # The get_kline time interval is inclusive by start_time.
+    # Thus, we subtract 15 minutes to only fetch closed ones.
     args = GetKlineArgs(
         symbol=symbol,
         interval="15",
         limit=7 * 24 * 4,  # Number of observations in one week
         start=partition_start,
         end=partition_end - dt.timedelta(minutes=15),
+    )
+    context.log.info(f"Fetching kline with args {args}")
+    result = bybit_api.get_kline(args).with_columns(
+        symbol=pl.lit(symbol), ingested_at=dt.datetime.now()
+    )
+
+    return result
+
+
+@dg.asset(
+    description="Stock prices from Bybit for every 15 minutes starting from the first day of the week until the current run time. This asset can be used to add to the weekly partitioned ones to form a dataset that includes everything until the most recent run.",
+    kinds={"python", "polars"},
+    io_manager_key="polars_parquet_io_manager",
+    partitions_def=bybit_symbols_partition,
+    retry_policy=bybit_retry_policy,
+)
+def raw_bybit_prices_15min_this_week(
+    context: dg.AssetExecutionContext, bybit_api: BybitApiV5Resource
+) -> pl.DataFrame:
+    symbol = context.partition_key
+    context.log.info(f"Starting run_id {context.run_id} for symbol {symbol}")
+
+    # The get_kline time interval is inclusive by start_time.
+    # Thus, we subtract 15 minutes to only fetch closed ones.
+    args = GetKlineArgs(
+        symbol=symbol,
+        interval="15",
+        limit=7 * 24 * 4,  # Number of observations in one week
+        start=DateTime.start_of_week_utc(dt.datetime.now()),
+        end=dt.datetime.now(pytz.timezone("UTC")) - dt.timedelta(minutes=15),
     )
     context.log.info(f"Fetching kline with args {args}")
     result = bybit_api.get_kline(args).with_columns(
@@ -75,17 +110,52 @@ def raw_bybit_prices_15min_weekly(
     ins={
         "raw_bybit_prices_15min_weekly": dg.AssetIn(
             partition_mapping=dg.MultiToSingleDimensionPartitionMapping("symbol")
-        )
+        ),
+        "raw_bybit_prices_15min_this_week": dg.AssetIn(
+            partition_mapping=dg.IdentityPartitionMapping()
+        ),
     },
 )
 def stg_bybit_prices_15min(
     context: dg.AssetExecutionContext,
     raw_bybit_prices_15min_weekly: Dict[str, pl.DataFrame],
+    raw_bybit_prices_15min_this_week: pl.DataFrame,
 ) -> pl.DataFrame:
     context.log.info(f"Combining {len(raw_bybit_prices_15min_weekly)} dataframes")
 
     result = pl.concat(raw_bybit_prices_15min_weekly.values())
-    context.log.info(f"Created dataframe of shape {result.shape}")
+    context.log.info(f"Concatenated weeks into a dataframe of shape {result.shape}")
+
+    observations_to_append = raw_bybit_prices_15min_this_week.filter(
+        pl.col("start_time_utc") >= result.get_column("start_time_utc").max()
+    )
+
+    if len(observations_to_append) > 0:
+        result = pl.concat([result, observations_to_append])
+        context.log.info(
+            f"Added this week ({len(observations_to_append)} rows), resulting in shape {result.shape}"
+        )
+    else:
+        context.log.info("No observations to append from this week")
+
+    n_combined = len(result)
+
+    # Remove duplicates
+    result = (
+        result.with_columns(
+            pl.col("start_time_utc")
+            .rank()
+            .over(
+                partition_by=["symbol", "start_time_utc"],
+                order_by="ingested_at",
+                descending=True,
+            )
+            .alias("rank")
+        )
+        .filter(pl.col("rank") <= 1)
+        .drop("rank")
+    )
+    context.log.info(f"Removed {n_combined - len(result)} duplicates")
 
     return result
 

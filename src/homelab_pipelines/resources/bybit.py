@@ -28,6 +28,21 @@ class BybitApiV5Resource(dg.ConfigurableResource):
     base_url: str
 
     def get_kline(self, args: GetKlineArgs) -> pl.DataFrame:
+        schema = {
+            "start_time_ms": pl.Int64(),
+            "open": pl.Float32(),
+            "high": pl.Float32(),
+            "low": pl.Float32(),
+            "close": pl.Float32(),
+            "volume": pl.Float32(),
+            "turnover": pl.Float32(),
+        }
+
+        if args.end <= args.start:
+            raise ValueError(
+                f"Start date ({args.start}) should be before end date ({args.end})"
+            )
+
         url = f"{self.base_url}/v5/market/kline"
         args_dict = args.model_dump()
         args_dict["start"] = self._dt_to_bybit_timestamp(args_dict["start"])
@@ -41,15 +56,7 @@ class BybitApiV5Resource(dg.ConfigurableResource):
         result = (
             pl.DataFrame(
                 data["result"]["list"],
-                schema={
-                    "start_time_ms": pl.Int64(),
-                    "open": pl.Float32(),
-                    "high": pl.Float32(),
-                    "low": pl.Float32(),
-                    "close": pl.Float32(),
-                    "volume": pl.Float32(),
-                    "turnover": pl.Float32(),
-                },
+                schema=schema,
             )
             .with_columns(
                 pl.from_epoch("start_time_ms", time_unit="ms")
