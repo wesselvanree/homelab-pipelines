@@ -8,7 +8,9 @@ class BybitSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="BYBIT_")
 
     base_url: str
-    """The base url for the HTTP api (e.g. `https://api-testnet.bybit.com` for testnet)"""
+    """The base url for the HTTP api (e.g. `https://api-testnet.bybit.com` for testnet). 
+    
+    See https://bybit-exchange.github.io/docs/v5/guide#authentication for more endpoints."""
 
 
 class ModelSettings(BaseSettings):
