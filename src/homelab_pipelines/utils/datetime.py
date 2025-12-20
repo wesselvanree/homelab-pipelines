@@ -3,7 +3,7 @@ import datetime as dt
 from tzlocal import get_localzone_name
 
 
-class DateTime:
+class Datetime:
     local_tz = get_localzone_name()
 
     @staticmethod
@@ -17,7 +17,7 @@ class DateTime:
     @staticmethod
     def start_of_week_utc(value: dt.datetime) -> dt.datetime:
         return value.combine(
-            DateTime.last_monday(value.date()),
+            Datetime.last_monday(value.date()),
             dt.time(0, 0),
             tzinfo=dt.timezone.utc,
         )

@@ -7,7 +7,7 @@ import pytz
 
 from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetKlineArgs
 from homelab_pipelines.settings import ModelSettings
-from homelab_pipelines.utils.datetime import DateTime
+from homelab_pipelines.utils.datetime import Datetime
 from homelab_pipelines.utils.paths import Paths
 
 bybit_symbols = (
@@ -66,7 +66,7 @@ def raw_bybit_prices_15min_weekly(
     context.log.info(f"Fetching kline with args {args}")
     result = bybit_api.get_kline(args).with_columns(
         symbol=pl.lit(symbol),
-        ingested_at=pl.lit(DateTime.now_utc()).dt.convert_time_zone(DateTime.local_tz),
+        ingested_at=pl.lit(Datetime.now_utc()).dt.convert_time_zone(Datetime.local_tz),
     )
 
     return result
@@ -91,13 +91,13 @@ def raw_bybit_prices_15min_this_week(
         symbol=symbol,
         interval="15",
         limit=7 * 24 * 4,  # Number of observations in one week
-        start=DateTime.start_of_week_utc(DateTime.now_utc()),
-        end=DateTime.now_utc() - dt.timedelta(minutes=15),
+        start=Datetime.start_of_week_utc(Datetime.now_utc()),
+        end=Datetime.now_utc() - dt.timedelta(minutes=15),
     )
     context.log.info(f"Fetching kline with args {args}")
     result = bybit_api.get_kline(args).with_columns(
         symbol=pl.lit(symbol),
-        ingested_at=pl.lit(DateTime.now_utc()).dt.convert_time_zone(DateTime.local_tz),
+        ingested_at=pl.lit(Datetime.now_utc()).dt.convert_time_zone(Datetime.local_tz),
     )
 
     return result
