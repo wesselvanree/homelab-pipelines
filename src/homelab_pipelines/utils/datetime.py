@@ -1,9 +1,15 @@
 import datetime as dt
 
-import pytz
+from tzlocal import get_localzone_name
 
 
 class DateTime:
+    local_tz = get_localzone_name()
+
+    @staticmethod
+    def now_utc() -> dt.datetime:
+        return dt.datetime.now(dt.timezone.utc)
+
     @staticmethod
     def last_monday(d: dt.date) -> dt.date:
         return d - dt.timedelta(days=d.weekday())
@@ -13,5 +19,5 @@ class DateTime:
         return value.combine(
             DateTime.last_monday(value.date()),
             dt.time(0, 0),
-            tzinfo=pytz.timezone("UTC"),
+            tzinfo=dt.timezone.utc,
         )

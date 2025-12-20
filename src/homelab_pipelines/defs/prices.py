@@ -65,7 +65,8 @@ def raw_bybit_prices_15min_weekly(
     )
     context.log.info(f"Fetching kline with args {args}")
     result = bybit_api.get_kline(args).with_columns(
-        symbol=pl.lit(symbol), ingested_at=dt.datetime.now()
+        symbol=pl.lit(symbol),
+        ingested_at=pl.lit(DateTime.now_utc()).dt.convert_time_zone(DateTime.local_tz),
     )
 
     return result
@@ -90,12 +91,13 @@ def raw_bybit_prices_15min_this_week(
         symbol=symbol,
         interval="15",
         limit=7 * 24 * 4,  # Number of observations in one week
-        start=DateTime.start_of_week_utc(dt.datetime.now()),
-        end=dt.datetime.now(pytz.timezone("UTC")) - dt.timedelta(minutes=15),
+        start=DateTime.start_of_week_utc(DateTime.now_utc()),
+        end=DateTime.now_utc() - dt.timedelta(minutes=15),
     )
     context.log.info(f"Fetching kline with args {args}")
     result = bybit_api.get_kline(args).with_columns(
-        symbol=pl.lit(symbol), ingested_at=dt.datetime.now()
+        symbol=pl.lit(symbol),
+        ingested_at=pl.lit(DateTime.now_utc()).dt.convert_time_zone(DateTime.local_tz),
     )
 
     return result
@@ -111,9 +113,7 @@ def raw_bybit_prices_15min_this_week(
         "raw_bybit_prices_15min_weekly": dg.AssetIn(
             partition_mapping=dg.MultiToSingleDimensionPartitionMapping("symbol")
         ),
-        "raw_bybit_prices_15min_this_week": dg.AssetIn(
-            partition_mapping=dg.IdentityPartitionMapping()
-        ),
+        "raw_bybit_prices_15min_this_week": dg.AssetIn(),
     },
 )
 def stg_bybit_prices_15min(
@@ -166,7 +166,7 @@ def stg_bybit_prices_15min(
     io_manager_key="polars_parquet_io_manager",
     partitions_def=bybit_symbols_partition,
     automation_condition=dg.AutomationCondition.eager(),
-    ins={"stg_bybit_prices_15min": dg.AssetIn(key="stg_bybit_prices_15min")},
+    ins={"stg_bybit_prices_15min": dg.AssetIn()},
 )
 def stg_prices_15min_model_train(
     context: dg.AssetExecutionContext,
