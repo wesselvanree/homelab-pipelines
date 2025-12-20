@@ -5,16 +5,10 @@ from typing import Dict, Optional
 import dagster as dg
 import polars as pl
 
+from homelab_pipelines.defs.static_data import bybit_symbols
 from homelab_pipelines.resources.bybit import BybitApiV5Resource, GetKlineArgs
 from homelab_pipelines.settings import ModelSettings
 from homelab_pipelines.utils.datetime import Datetime
-from homelab_pipelines.utils.paths import Paths
-
-# This file does not change often. Including it like this means the dagster UI shows all partitions at once.
-bybit_symbols = pl.read_csv(
-    Paths.defs_data / "bybit_symbols.csv",
-    schema_overrides={"launch_time": pl.Datetime("ns", "UTC")},
-)
 
 bybit_symbols_partition = dg.StaticPartitionsDefinition(
     bybit_symbols.get_column("symbol").to_list()
