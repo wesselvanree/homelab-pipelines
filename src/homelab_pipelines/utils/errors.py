@@ -1,0 +1,2 @@
+class EndTimeBeforeStartTimeError(Exception):
+    pass

@@ -8,6 +8,8 @@ import polars as pl
 import requests
 from pydantic import BaseModel, Field
 
+from homelab_pipelines.utils.errors import EndTimeBeforeStartTimeError
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,18 +30,8 @@ class BybitApiV5Resource(dg.ConfigurableResource):
     base_url: str
 
     def get_kline(self, args: GetKlineArgs) -> pl.DataFrame:
-        schema = {
-            "start_time_ms": pl.Int64(),
-            "open": pl.Float32(),
-            "high": pl.Float32(),
-            "low": pl.Float32(),
-            "close": pl.Float32(),
-            "volume": pl.Float32(),
-            "turnover": pl.Float32(),
-        }
-
         if args.end <= args.start:
-            raise ValueError(
+            raise EndTimeBeforeStartTimeError(
                 f"Start date ({args.start}) should be before end date ({args.end})"
             )
 
@@ -56,14 +48,25 @@ class BybitApiV5Resource(dg.ConfigurableResource):
         result = (
             pl.DataFrame(
                 data["result"]["list"],
-                schema=schema,
+                schema={
+                    "start_time_ms": pl.Int64(),
+                    "open": pl.Float32(),
+                    "high": pl.Float32(),
+                    "low": pl.Float32(),
+                    "close": pl.Float32(),
+                    "volume": pl.Float32(),
+                    "turnover": pl.Float32(),
+                },
             )
             .with_columns(
                 pl.from_epoch("start_time_ms", time_unit="ms")
-                .dt.convert_time_zone("UTC")
+                .cast(pl.Datetime("us", "UTC"))
                 .alias("start_time_utc")
             )
-            .drop("start_time_ms")
+            # Reorder columns
+            .select(
+                "start_time_utc", "open", "high", "low", "close", "volume", "turnover"
+            )
         )
 
         return result
