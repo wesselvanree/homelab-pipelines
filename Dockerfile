@@ -1,6 +1,5 @@
 # Install uv
-FROM python:3.12-slim AS builder
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim as builder
 
 # Change the working directory to the `app` directory
 WORKDIR /app
@@ -9,7 +8,7 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-editable
+    uv sync --locked --no-install-project --no-editable --no-dev
 
 
 FROM python:3.12-slim
@@ -18,9 +17,14 @@ FROM python:3.12-slim
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 
 # Copy your Dagster project. You may need to replace the filepath depending on your project structure
-COPY . /app/
+COPY src ./app/src
+COPY dagster.yaml ./app/dagster.yaml
+ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app/
 
 # Expose the port that your Dagster instance will run on
 EXPOSE 80
+
+# Start Dagster gRPC server
+CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "80", "-m", "src"]
